@@ -29,3 +29,13 @@ export interface ApiError {
     message: string;
     errors?: Record<string, string[]>;
 }
+
+export interface Application {
+    id: string;
+    name: string;
+    description: string;
+    status: 'Siapro' | 'Beta' | 'Ready';
+    url: string;
+    access?: string;
+    notifications?: number;
+}
