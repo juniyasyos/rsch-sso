@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Hospital, Lock, User, Heart, Activity, Stethoscope } from 'lucide-react';
 
 interface LoginProps {
@@ -11,6 +11,17 @@ export default function Login({ onLogin, isLoading = false, error }: LoginProps)
   const [nip, setNip] = useState('');
   const [password, setPassword] = useState('');
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
+  // Auto-fill untuk development mode
+  useEffect(() => {
+    const isDev = import.meta.env.VITE_APP_ENV === 'dev';
+    if (isDev) {
+      const devNip = import.meta.env.VITE_DEV_NIP || '';
+      const devPassword = import.meta.env.VITE_DEV_PASSWORD || '';
+      setNip(devNip);
+      setPassword(devPassword);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +86,11 @@ export default function Login({ onLogin, isLoading = false, error }: LoginProps)
             RS Citra Husada
           </h1>
           <p className="text-slate-500 text-lg">Single Sign-On Portal</p>
+          {import.meta.env.VITE_APP_ENV === 'dev' && (
+            <div className="mt-2 px-3 py-1 bg-orange-100 border border-orange-300 rounded-full text-orange-800 text-sm font-medium text-center">
+              Development Mode - Auto-filled credentials
+            </div>
+          )}
           <div className="mt-4 h-1 w-20 bg-gradient-to-r from-blue-400 to-cyan-400 mx-auto rounded-full animate-pulse" />
         </div>
 
@@ -99,7 +115,9 @@ export default function Login({ onLogin, isLoading = false, error }: LoginProps)
                 onFocus={() => setFocusedInput('nip')}
                 onBlur={() => setFocusedInput(null)}
                 placeholder="Masukkan NIP"
-                className="w-full pl-10 pr-4 py-4 bg-transparent border-b-2 border-slate-200 transition-all duration-300 outline-none text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:pl-12"
+                className={`w-full pl-10 pr-4 py-4 bg-transparent border-b-2 border-slate-200 transition-all duration-300 outline-none text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:pl-12 ${
+                  import.meta.env.VITE_APP_ENV === 'dev' && nip ? 'bg-orange-50/50' : ''
+                }`}
                 required
                 disabled={isLoading}
               />
@@ -128,7 +146,9 @@ export default function Login({ onLogin, isLoading = false, error }: LoginProps)
                 onFocus={() => setFocusedInput('password')}
                 onBlur={() => setFocusedInput(null)}
                 placeholder="Masukkan password"
-                className="w-full pl-10 pr-4 py-4 bg-transparent border-b-2 border-slate-200 transition-all duration-300 outline-none text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:pl-12"
+                className={`w-full pl-10 pr-4 py-4 bg-transparent border-b-2 border-slate-200 transition-all duration-300 outline-none text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:pl-12 ${
+                  import.meta.env.VITE_APP_ENV === 'dev' && password ? 'bg-orange-50/50' : ''
+                }`}
                 required
                 disabled={isLoading}
               />
