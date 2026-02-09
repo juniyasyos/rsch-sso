@@ -1,0 +1,17 @@
+import { useAuthStore } from '../context/AuthContext';
+
+export const useAuth = () => {
+    const store = useAuthStore();
+
+    return {
+        user: store.user,
+        isAuthenticated: store.isAuthenticated,
+        isLoading: store.isLoading,
+        error: store.error,
+        login: store.login,
+        register: store.register,
+        logout: store.logout,
+        checkAuth: store.checkAuth,
+        clearError: store.clearError,
+    };
+};

@@ -2,18 +2,20 @@ import { useState } from 'react';
 import { Hospital, Lock, User, Heart, Activity, Stethoscope } from 'lucide-react';
 
 interface LoginProps {
-  onLogin: (username: string) => void;
+  onLogin: (nip: string, password: string) => void;
+  isLoading?: boolean;
+  error?: string | null;
 }
 
-export default function Login({ onLogin }: LoginProps) {
-  const [username, setUsername] = useState('');
+export default function Login({ onLogin, isLoading = false, error }: LoginProps) {
+  const [nip, setNip] = useState('');
   const [password, setPassword] = useState('');
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username && password) {
-      onLogin(username);
+    if (nip && password && !isLoading) {
+      onLogin(nip, password);
     }
   };
 
@@ -78,30 +80,31 @@ export default function Login({ onLogin }: LoginProps) {
 
         {/* Login Form */}
         <div className="space-y-8">
-          {/* Username Input */}
+          {/* NIP Input */}
           <div className="relative group">
-            <label htmlFor="username" className="block text-slate-600 font-medium mb-3 ml-1">
-              Username / NIP
+            <label htmlFor="nip" className="block text-slate-600 font-medium mb-3 ml-1">
+              NIP
             </label>
             <div className="relative">
               <div className={`absolute left-0 top-1/2 -translate-y-1/2 transition-all duration-300 ${
-                focusedInput === 'username' ? 'text-blue-500' : 'text-slate-400'
+                focusedInput === 'nip' ? 'text-blue-500' : 'text-slate-400'
               }`}>
                 <User className="w-5 h-5" />
               </div>
               <input
                 type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onFocus={() => setFocusedInput('username')}
+                id="nip"
+                value={nip}
+                onChange={(e) => setNip(e.target.value)}
+                onFocus={() => setFocusedInput('nip')}
                 onBlur={() => setFocusedInput(null)}
-                placeholder="Masukkan username atau NIP"
+                placeholder="Masukkan NIP"
                 className="w-full pl-10 pr-4 py-4 bg-transparent border-b-2 border-slate-200 transition-all duration-300 outline-none text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:pl-12"
                 required
+                disabled={isLoading}
               />
               <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-400 transition-all duration-300 ${
-                focusedInput === 'username' ? 'w-full' : 'w-0'
+                focusedInput === 'nip' ? 'w-full' : 'w-0'
               }`} />
             </div>
           </div>
@@ -127,6 +130,7 @@ export default function Login({ onLogin }: LoginProps) {
                 placeholder="Masukkan password"
                 className="w-full pl-10 pr-4 py-4 bg-transparent border-b-2 border-slate-200 transition-all duration-300 outline-none text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:pl-12"
                 required
+                disabled={isLoading}
               />
               <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-400 transition-all duration-300 ${
                 focusedInput === 'password' ? 'w-full' : 'w-0'
@@ -137,11 +141,21 @@ export default function Login({ onLogin }: LoginProps) {
           {/* Login Button */}
           <button
             onClick={handleSubmit}
-            className="w-full relative group overflow-hidden bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-4 rounded-full shadow-lg hover:shadow-2xl transition-all duration-300 mt-8 hover:scale-105 active:scale-95"
+            disabled={isLoading}
+            className="w-full relative group overflow-hidden bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-4 rounded-full shadow-lg hover:shadow-2xl transition-all duration-300 mt-8 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            <span className="relative z-10 font-semibold text-lg">Login</span>
+            <span className="relative z-10 font-semibold text-lg">
+              {isLoading ? 'Logging in...' : 'Login'}
+            </span>
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </button>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Footer */}

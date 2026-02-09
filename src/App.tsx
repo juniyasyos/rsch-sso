@@ -1,28 +1,25 @@
-import { useState } from 'react';
-import Login from './components/Login';
-import Dashboard from './components/Dashboard';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import { useAuth } from './hooks/useAuth';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState('');
+  const { checkAuth } = useAuth();
 
-  const handleLogin = (user: string) => {
-    setUsername(user);
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUsername('');
-  };
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   return (
-    <div className="font-['Poppins',sans-serif] antialiased">
-      {!isAuthenticated ? (
-        <Login onLogin={handleLogin} />
-      ) : (
-        <Dashboard username={username} onLogout={handleLogout} />
-      )}
-    </div>
+    <Router>
+      <div className="font-['Poppins',sans-serif] antialiased">
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/" element={<LoginPage />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
