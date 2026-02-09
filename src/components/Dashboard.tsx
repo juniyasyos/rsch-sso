@@ -13,7 +13,7 @@ import {
   User,
   X
 } from 'lucide-react';
-import type { User as UserType, Application } from '../types';
+import type { User as UserType, Application, UserApplication } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { dashboardService } from '../services/dashboardService';
 
@@ -47,16 +47,39 @@ export default function Dashboard({ user }: DashboardProps) {
   useEffect(() => {
     const fetchApplications = async () => {
       try {
-        const apps = await dashboardService.getApplications();
-        const appsWithIcons = apps.map((app: Application) => ({
-          ...app,
-          icon: appConfig[app.name]?.icon || Hospital,
-          gradient: appConfig[app.name]?.gradient || 'from-gray-500 to-gray-600',
-        }));
-        setApplications(appsWithIcons);
+        // Applications data now comes from user object via /api/users/me
+        if (user?.applications && user.applications.length > 0) {
+          const appsWithIcons = user.applications.map((app: UserApplication) => ({
+            id: app.app_key,
+            name: app.name,
+            description: app.description,
+            status: 'Ready' as const, // Default status, can be enhanced later
+            url: `/${app.app_key}`, // Default URL pattern
+            access: 'public', // Default access, can be enhanced later
+            notifications: 0, // Default notifications, can be enhanced later
+            icon: appConfig[app.name]?.icon || Hospital,
+            gradient: appConfig[app.name]?.gradient || 'from-gray-500 to-gray-600',
+          }));
+          setApplications(appsWithIcons);
+        } else {
+          // Fallback to hardcoded if no applications from API
+          setApplications([
+            {
+              id: '1',
+              name: 'Application Control-Client',
+              description: 'Aplikasi control-client untuk merevisi integrasi sistem untuk operasi akses sistem.',
+              icon: ShieldCheck,
+              status: 'Siapro',
+              access: 'Akses: Control-Client',
+              url: '#app-control',
+              gradient: 'from-blue-500 to-blue-600',
+              notifications: 5
+            },
+          ]);
+        }
       } catch (error) {
-        console.error('Failed to fetch applications:', error);
-        // Fallback to hardcoded if API fails
+        console.error('Failed to process applications:', error);
+        // Fallback to hardcoded if error
         setApplications([
           {
             id: '1',
@@ -69,7 +92,6 @@ export default function Dashboard({ user }: DashboardProps) {
             gradient: 'from-blue-500 to-blue-600',
             notifications: 5
           },
-          // ... other hardcoded apps
         ]);
       } finally {
         setLoading(false);
@@ -77,14 +99,16 @@ export default function Dashboard({ user }: DashboardProps) {
     };
 
     fetchApplications();
-  }, []);
+  }, [user]);
 
-  // Placeholder for role and nip, will be fetched from API
-  const role = 'Dokter'; // This should come from user data or API
-  const nip = '123456789'; // This should come from user data or API
+  // Placeholder for role and nip, will be fetched from user data
+  const role = user?.role || 'Pengguna Sistem';
+  const nip = user?.nip || '---';
 
   const handleAppClick = (app: Application) => {
-    alert(`Membuka aplikasi ${app.name}...`);
+    if (app.url) {
+      window.open(app.url, '_blank');
+    }
   };
 
   return (
@@ -331,8 +355,22 @@ export default function Dashboard({ user }: DashboardProps) {
                                 {app.description}
                               </p>
                               
-                              {/* Access Info */}
-                              <div className="space-y-1.5">
+                              {/* Status and Access Info */}
+                              <div className="space-y-1.5 flex flex-wrap gap-2">
+                                {/* Status Badge */}
+                                {app.status && (
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                                      app.status === 'Ready' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                                      app.status === 'Beta' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                                      'bg-slate-100 text-slate-700 border border-slate-200'
+                                    }`}>
+                                      {app.status}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* Access Badge */}
                                 {app.access && (
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs border border-blue-200 text-blue-700 bg-blue-50/80 backdrop-blur-sm px-2 py-1 rounded">
