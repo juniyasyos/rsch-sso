@@ -56,7 +56,7 @@ export default function Dashboard({ user }: DashboardProps) {
             status: 'Ready' as const, // Default status, can be enhanced later
             url: `/${app.app_key}`, // Default URL pattern
             access: 'public', // Default access, can be enhanced later
-            notifications: 0, // Default notifications, can be enhanced later
+            notifications: app.notifications ?? 0, // Default notifications, can be enhanced later
             icon: appConfig[app.name]?.icon || Hospital,
             gradient: appConfig[app.name]?.gradient || 'from-gray-500 to-gray-600',
           }));
@@ -175,7 +175,10 @@ export default function Dashboard({ user }: DashboardProps) {
                 </div>
 
                 <div className="pt-4 space-y-3">
-                  <button className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">
+                  <button 
+                    onClick={() => window.open(import.meta.env.VITE_ADMIN_PANEL_URL || 'http://localhost:8010/panel', '_blank')}
+                    className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
+                  >
                     <Settings className="w-5 h-5" />
                     Admin Panel
                   </button>
@@ -242,7 +245,10 @@ export default function Dashboard({ user }: DashboardProps) {
                 </div>
 
                 <div className="pt-4 space-y-3">
-                  <button className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">
+                  <button 
+                    onClick={() => window.open(import.meta.env.VITE_ADMIN_PANEL_URL || 'http://localhost:8010/panel', '_blank')}
+                    className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
+                  >
                     <Settings className="w-5 h-5" />
                     Admin Panel
                   </button>
@@ -332,13 +338,12 @@ export default function Dashboard({ user }: DashboardProps) {
                             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-cyan-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
 
                             {/* Notification Badge */}
-                            {app.notifications && app.notifications > 0 && (
+
                               <div className="absolute top-3 right-3 z-20">
                                 <div className="bg-gradient-to-r from-rose-500 to-pink-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
                                   {app.notifications > 99 ? '99+' : app.notifications}
                                 </div>
                               </div>
-                            )}
 
                             {/* Icon */}
                             <div className={`inline-flex p-3.5 rounded-xl bg-gradient-to-br ${app.gradient} text-white shadow-lg mb-4 relative z-10 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300`}>
