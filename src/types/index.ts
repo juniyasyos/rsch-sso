@@ -44,11 +44,18 @@ export interface ApiError {
 export interface Application {
     id: string;
     name: string;
-    description: string;
-    status: 'Siapro' | 'Beta' | 'Ready';
-    url: string;
+    description?: string;
+    status?: 'Siapro' | 'Beta' | 'Ready' | 'Offline';
+    url?: string;
     access?: string;
     notifications?: number;
+    app_key?: string;
+    app_url?: string;
+    logo_url?: string;
+    enabled?: boolean;
+    roles?: Role[];
+    redirect_uris?: string[];
+    isOnline?: boolean;
 }
 
 export interface Role {

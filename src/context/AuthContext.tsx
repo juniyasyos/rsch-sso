@@ -33,6 +33,15 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
           localStorage.setItem('access_token', response.access_token);
+
+          // Create Laravel session from Passport token
+          // This allows user to access backend panel routes
+          try {
+            await authService.createSessionFromToken(response.access_token);
+          } catch (sessionError) {
+            console.warn('Failed to create backend session:', sessionError);
+            // Don't fail login - token auth might still work
+          }
         } catch (error: any) {
           set({
             error: error.response?.data?.message || 'Login failed',
@@ -52,6 +61,14 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
           localStorage.setItem('access_token', response.access_token);
+
+          // Create Laravel session from Passport token
+          try {
+            await authService.createSessionFromToken(response.access_token);
+          } catch (sessionError) {
+            console.warn('Failed to create backend session:', sessionError);
+            // Don't fail registration
+          }
         } catch (error: any) {
           set({
             error: error.response?.data?.message || 'Registration failed',

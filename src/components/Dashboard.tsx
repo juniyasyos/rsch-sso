@@ -16,6 +16,7 @@ import {
 import type { User as UserType, Application, UserApplication } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { dashboardService } from '../services/dashboardService';
+import { ssoService } from '../services/ssoService';
 
 interface DashboardProps {
   user: UserType;
@@ -24,6 +25,7 @@ interface DashboardProps {
 interface ApplicationWithIcon extends Application {
   icon: React.ElementType;
   gradient: string;
+  isOnline: boolean;
 }
 
 export default function Dashboard({ user }: DashboardProps) {
@@ -47,59 +49,45 @@ export default function Dashboard({ user }: DashboardProps) {
   useEffect(() => {
     const fetchApplications = async () => {
       try {
-        // Applications data now comes from user object via /api/users/me
-        if (user?.applications && user.applications.length > 0) {
-          const appsWithIcons = user.applications.map((app: UserApplication) => ({
+        const appsFromApi = await dashboardService.getApplications();
+        
+        const appsWithIcons = appsFromApi.map((app) => {
+          // Determine icon and gradient based on app name
+          const config = appConfig[app.name] || { 
+            icon: Hospital, 
+            gradient: 'from-gray-500 to-gray-600' 
+          };
+
+          // Status based on enabled flag from API
+          const appStatus: 'Ready' | 'Beta' = app.enabled ? 'Ready' : 'Beta';
+          const isOnline = app.enabled;
+
+          return {
             id: app.app_key,
             name: app.name,
-            description: app.description,
-            status: 'Ready' as const, // Default status, can be enhanced later
-            url: `/${app.app_key}`, // Default URL pattern
-            access: 'public', // Default access, can be enhanced later
-            notifications: app.notifications ?? 0, // Default notifications, can be enhanced later
-            icon: appConfig[app.name]?.icon || Hospital,
-            gradient: appConfig[app.name]?.gradient || 'from-gray-500 to-gray-600',
-          }));
-          setApplications(appsWithIcons);
-        } else {
-          // Fallback to hardcoded if no applications from API
-          setApplications([
-            {
-              id: '1',
-              name: 'Application Control-Client',
-              description: 'Aplikasi control-client untuk merevisi integrasi sistem untuk operasi akses sistem.',
-              icon: ShieldCheck,
-              status: 'Siapro',
-              access: 'Akses: Control-Client',
-              url: '#app-control',
-              gradient: 'from-blue-500 to-blue-600',
-              notifications: 5
-            },
-          ]);
-        }
+            description: app.description || '',
+            status: appStatus,
+            url: app.app_url || `/${app.app_key}`,
+            access: app.enabled ? 'Available' : 'Unavailable',
+            notifications: 0,
+            icon: config.icon,
+            gradient: config.gradient,
+            isOnline: isOnline,
+          };
+        });
+
+        setApplications(appsWithIcons);
       } catch (error) {
-        console.error('Failed to process applications:', error);
-        // Fallback to hardcoded if error
-        setApplications([
-          {
-            id: '1',
-            name: 'Application Control-Client',
-            description: 'Aplikasi control-client untuk merevisi integrasi sistem untuk operasi akses sistem.',
-            icon: ShieldCheck,
-            status: 'Siapro',
-            access: 'Akses: Control-Client',
-            url: '#app-control',
-            gradient: 'from-blue-500 to-blue-600',
-            notifications: 5
-          },
-        ]);
+        console.error('Failed to fetch applications:', error);
+        // Fallback to empty array - user can see no apps loaded
+        setApplications([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchApplications();
-  }, [user]);
+  }, []);
 
   // Placeholder for role and nip, will be fetched from user data
   const role = user?.role || 'Pengguna Sistem';
@@ -127,7 +115,7 @@ export default function Dashboard({ user }: DashboardProps) {
           
           {/* Desktop Popup */}
           <div className="fixed top-20 right-4 md:right-8 z-50 hidden md:block">
-            <div className="bg-white rounded-2xl shadow-2xl w-80 animate-slideDown" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-96 animate-slideDown" onClick={(e) => e.stopPropagation()}>
               {/* Modal Header */}
               <div className="bg-gradient-to-r from-blue-500 to-cyan-500 p-6 rounded-t-2xl">
                 <div className="flex items-center justify-between mb-4">
@@ -176,7 +164,14 @@ export default function Dashboard({ user }: DashboardProps) {
 
                 <div className="pt-4 space-y-3">
                   <button 
-                    onClick={() => window.open(import.meta.env.VITE_ADMIN_PANEL_URL || 'http://localhost:8010/panel', '_blank')}
+                    onClick={() => {
+                      try {
+                        ssoService.redirectToAdminPanel();
+                      } catch (error) {
+                        console.error('Failed to access admin panel:', error);
+                        alert('Gagal mengakses Admin Panel. Silakan coba lagi.');
+                      }
+                    }}
                     className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
                   >
                     <Settings className="w-5 h-5" />
@@ -196,7 +191,7 @@ export default function Dashboard({ user }: DashboardProps) {
           </div>
 
           {/* Mobile Sidebar */}
-          <div className="fixed top-0 right-0 h-full z-50 md:hidden w-80 max-w-[85vw] animate-slideLeft" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed top-0 right-0 h-full z-50 md:hidden w-96 max-w-[100vw] animate-slideLeft" onClick={(e) => e.stopPropagation()}>
             <div className="bg-white h-full shadow-2xl flex flex-col">
               {/* Modal Header */}
               <div className="bg-gradient-to-r from-blue-500 to-cyan-500 p-6">
@@ -246,7 +241,14 @@ export default function Dashboard({ user }: DashboardProps) {
 
                 <div className="pt-4 space-y-3">
                   <button 
-                    onClick={() => window.open(import.meta.env.VITE_ADMIN_PANEL_URL || 'http://localhost:8010/panel', '_blank')}
+                    onClick={() => {
+                      try {
+                        ssoService.redirectToAdminPanel();
+                      } catch (error) {
+                        console.error('Failed to access admin panel:', error);
+                        alert('Gagal mengakses Admin Panel. Silakan coba lagi.');
+                      }
+                    }}
                     className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
                   >
                     <Settings className="w-5 h-5" />
@@ -279,7 +281,7 @@ export default function Dashboard({ user }: DashboardProps) {
             </div>
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-700 via-cyan-600 to-teal-600 bg-clip-text text-transparent">
-                UNIFIED ACCESS
+                Single Sign-On
               </h1>
               <p className="text-sm text-gray-600">
                 Portal akses terpadu Rumah Sakit Citra Husada Jember
@@ -316,6 +318,14 @@ export default function Dashboard({ user }: DashboardProps) {
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
             </div>
+          ) : applications.length === 0 ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="text-center">
+                <Hospital className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 text-lg">Tidak ada aplikasi yang tersedia</p>
+                <p className="text-gray-400 text-sm mt-2">Hubungi administrator untuk akses aplikasi</p>
+              </div>
+            </div>
           ) : (
             <>
               {/* Applications Grid - Full Width */}
@@ -331,11 +341,19 @@ export default function Dashboard({ user }: DashboardProps) {
                       >
                         <button
                           onClick={() => handleAppClick(app)}
-                          className="relative cursor-pointer group w-full text-left h-full"
+                          disabled={!app.isOnline}
+                          className="relative cursor-pointer group w-full text-left h-full disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 md:p-6 shadow-lg hover:shadow-2xl border border-blue-100/50 transition-all duration-300 h-full relative overflow-hidden hover:scale-105 active:scale-95">
+                          <div className={`bg-white/70 backdrop-blur-md rounded-2xl p-5 md:p-6 shadow-lg hover:shadow-2xl border border-blue-100/50 transition-all duration-300 h-full relative overflow-hidden ${!app.isOnline ? 'opacity-75' : 'hover:scale-105 active:scale-95'}`}>
                             {/* Gradient overlay on hover */}
                             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-cyan-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
+
+                            {/* Offline overlay */}
+                            {!app.isOnline && (
+                              <div className="absolute inset-0 bg-red-500/10 rounded-2xl z-30 flex items-center justify-center">
+                                <span className="text-red-700 font-semibold text-sm bg-red-100/80 px-3 py-1.5 rounded-lg backdrop-blur-sm">Offline</span>
+                              </div>
+                            )}
 
                             {/* Notification Badge */}
 
@@ -361,22 +379,28 @@ export default function Dashboard({ user }: DashboardProps) {
                               </p>
                               
                               {/* Status and Access Info */}
-                              <div className="space-y-1.5 flex flex-wrap gap-2">
+                              <div className="space-y-1.5 flex flex-wrap gap-2 items-center">
                                 {/* Status Badge */}
                                 {app.status && (
                                   <div className="flex items-center gap-2">
-                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
                                       app.status === 'Ready' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
                                       app.status === 'Beta' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
-                                      'bg-slate-100 text-slate-700 border border-slate-200'
+                                      'bg-red-100 text-red-700 border border-red-200'
                                     }`}>
+                                      {app.status === 'Offline' && (
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                                      )}
+                                      {(app.status === 'Ready' || app.status === 'Beta') && (
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                                      )}
                                       {app.status}
                                     </span>
                                   </div>
                                 )}
                                 
                                 {/* Access Badge */}
-                                {app.access && (
+                                {app.access && app.access !== 'Unavailable' && (
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs border border-blue-200 text-blue-700 bg-blue-50/80 backdrop-blur-sm px-2 py-1 rounded">
                                       {app.access}
@@ -387,7 +411,7 @@ export default function Dashboard({ user }: DashboardProps) {
                             </div>
 
                             {/* Hover indicator */}
-                            <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                            <div className={`absolute bottom-4 right-4 opacity-0 transition-opacity duration-300 z-10 ${!app.isOnline ? 'hidden' : 'group-hover:opacity-100'}`}>
                               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
                                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -406,9 +430,12 @@ export default function Dashboard({ user }: DashboardProps) {
         </div>
 
         {/* Footer Info */}
-        <div className="mt-12 text-center" style={{ animation: 'fadeIn 0.8s ease-out 1.5s forwards', opacity: 0 }}>
-          <p className="text-sm text-gray-500">
-            Klik pada aplikasi untuk mengakses sistem • Login sekali untuk semua akses
+        <div className="mt-16 text-center" style={{ animation: 'fadeIn 0.8s ease-out 1.5s forwards', opacity: 0 }}>
+          <p className="text-sm text-gray-500 mb-2">
+            💡 Tip: Klik pada aplikasi untuk membuka, atau akses Admin Panel untuk pengaturan tambahan
+          </p>
+          <p className="text-xs text-gray-400">
+            Semua data terlindungi dengan enkripsi tingkat enterprise
           </p>
         </div>
       </main>

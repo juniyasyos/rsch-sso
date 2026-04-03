@@ -25,4 +25,12 @@ export const authService = {
         const response = await api.post('/api/auth/refresh');
         return response.data;
     },
+
+    /**
+     * Create Laravel session from Passport token.
+     * This allows accessing backend panel routes that require session authentication.
+     */
+    async createSessionFromToken(accessToken: string): Promise<void> {
+        await api.post('/api/auth/session-from-token', { access_token: accessToken });
+    },
 };
