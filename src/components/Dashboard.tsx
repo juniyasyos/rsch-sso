@@ -11,18 +11,20 @@ import {
   Utensils,
   Settings,
   User,
-  X
+  X,
+  Award,
+  Lock
 } from 'lucide-react';
-import type { User as UserType, Application, UserApplication } from '../types';
+import type { User as UserType } from '../types';
 import { useAuth } from '../hooks/useAuth';
-import { dashboardService } from '../services/dashboardService';
+import { dashboardService, type AccessProfileResponse, type ApplicationInProfile } from '../services/dashboardService';
 import { ssoService } from '../services/ssoService';
 
 interface DashboardProps {
   user: UserType;
 }
 
-interface ApplicationWithIcon extends Application {
+interface ApplicationWithIcon extends ApplicationInProfile {
   icon: React.ElementType;
   gradient: string;
   isOnline: boolean;
@@ -31,8 +33,12 @@ interface ApplicationWithIcon extends Application {
 export default function Dashboard({ user }: DashboardProps) {
   const { logout } = useAuth();
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [applications, setApplications] = useState<ApplicationWithIcon[]>([]);
+  const [accessProfiles, setAccessProfiles] = useState<Array<{
+    profile: AccessProfileResponse;
+    applications: ApplicationWithIcon[];
+  }>>([]);
   const [loading, setLoading] = useState(true);
+  const [totalApps, setTotalApps] = useState(0);
 
   // Map of app names to icons and gradients
   const appConfig: Record<string, { icon: React.ElementType; gradient: string }> = {
@@ -49,38 +55,36 @@ export default function Dashboard({ user }: DashboardProps) {
   useEffect(() => {
     const fetchApplications = async () => {
       try {
-        const appsFromApi = await dashboardService.getApplications();
-        
-        const appsWithIcons = appsFromApi.map((app) => {
-          // Determine icon and gradient based on app name
-          const config = appConfig[app.name] || { 
-            icon: Hospital, 
-            gradient: 'from-gray-500 to-gray-600' 
-          };
+        const profiles = await dashboardService.getApplicationsByProfile();
 
-          // Status based on enabled flag from API
-          const appStatus: 'Ready' | 'Beta' = app.enabled ? 'Ready' : 'Beta';
-          const isOnline = app.enabled;
+        let totalAppCount = 0;
+        const profilesWithApps = profiles.map((profile) => {
+          const appsWithIcons = profile.applications.map((app) => {
+            const config = appConfig[app.name] || {
+              icon: Hospital,
+              gradient: 'from-gray-500 to-gray-600'
+            };
+            totalAppCount++;
+            return {
+              ...app,
+              icon: config.icon,
+              gradient: config.gradient,
+              isOnline: app.enabled,
+            };
+          });
 
           return {
-            id: app.app_key,
-            name: app.name,
-            description: app.description || '',
-            status: appStatus,
-            url: app.app_url || `/${app.app_key}`,
-            access: app.enabled ? 'Available' : 'Unavailable',
-            notifications: 0,
-            icon: config.icon,
-            gradient: config.gradient,
-            isOnline: isOnline,
+            profile,
+            applications: appsWithIcons,
           };
         });
 
-        setApplications(appsWithIcons);
+        setAccessProfiles(profilesWithApps);
+        setTotalApps(totalAppCount);
       } catch (error) {
         console.error('Failed to fetch applications:', error);
-        // Fallback to empty array - user can see no apps loaded
-        setApplications([]);
+        setAccessProfiles([]);
+        setTotalApps(0);
       } finally {
         setLoading(false);
       }
@@ -93,9 +97,9 @@ export default function Dashboard({ user }: DashboardProps) {
   const role = user?.role || 'Pengguna Sistem';
   const nip = user?.nip || '---';
 
-  const handleAppClick = (app: Application) => {
-    if (app.url) {
-      window.open(app.url, '_blank');
+  const handleAppClick = (app: ApplicationInProfile) => {
+    if (app.app_url) {
+      window.open(app.app_url, '_blank');
     }
   };
 
@@ -112,160 +116,135 @@ export default function Dashboard({ user }: DashboardProps) {
         <>
           {/* Backdrop */}
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowInfoModal(false)} />
-          
+
           {/* Desktop Popup */}
-          <div className="fixed top-20 right-4 md:right-8 z-50 hidden md:block">
-            <div className="bg-white rounded-2xl shadow-2xl w-96 animate-slideDown" onClick={(e) => e.stopPropagation()}>
-              {/* Modal Header */}
-              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 p-6 rounded-t-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-white">Info Akun</h2>
-                  <button 
-                    onClick={() => setShowInfoModal(false)}
-                    className="text-white/80 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
+          <div className="fixed top-20 right-6 z-50 hidden md:block">
+            <div className="bg-white w-80 rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <h2 className="text-base font-semibold text-gray-900">Info Akun</h2>
+                <button onClick={() => setShowInfoModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Profile */}
+              <div className="px-5 py-4 flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                  <User className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center shadow-lg">
-                    <User className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="text-white">
-                    <p className="text-lg font-semibold">{user?.name || 'User'}</p>
-                    <p className="text-sm text-white/80">{role}</p>
-                  </div>
+                <div>
+                  <p className="font-medium text-gray-900">{user?.name || 'User'}</p>
+                  <p className="text-sm text-gray-500">{role}</p>
                 </div>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Username</label>
-                  <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 font-medium">
-                    {user?.name || 'User'}
-                  </div>
-                </div>
+              {/* Divider */}
+              <div className="border-t border-gray-100" />
 
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">NIP</label>
-                  <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900">
-                    {nip}
-                  </div>
+              {/* Details */}
+              <div className="px-5 py-4 space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Username</span>
+                  <span className="font-medium text-gray-900">{user?.name}</span>
                 </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Role</label>
-                  <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 flex items-center justify-between">
-                    <span>{role}</span>
-                    <span className="bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-full font-medium">Active</span>
-                  </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">NIP</span>
+                  <span className="font-medium text-gray-900">{nip}</span>
                 </div>
-
-                <div className="pt-4 space-y-3">
-                  <button 
-                    onClick={() => {
-                      try {
-                        ssoService.redirectToAdminPanel();
-                      } catch (error) {
-                        console.error('Failed to access admin panel:', error);
-                        alert('Gagal mengakses Admin Panel. Silakan coba lagi.');
-                      }
-                    }}
-                    className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
-                  >
-                    <Settings className="w-5 h-5" />
-                    Admin Panel
-                  </button>
-
-                  <button 
-                    onClick={logout}
-                    className="w-full bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    Keluar
-                  </button>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Status</span>
+                  <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-600 font-medium">Active</span>
                 </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-100" />
+
+              {/* Actions */}
+              <div className="p-4 space-y-2">
+                <button
+                  onClick={() => ssoService.redirectToAdminPanel()}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 rounded-lg flex items-center justify-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  Admin Panel
+                </button>
+
+                <button
+                  onClick={logout}
+                  className="w-full text-sm text-red-600 hover:bg-red-50 py-2.5 rounded-lg flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Keluar
+                </button>
               </div>
             </div>
           </div>
 
           {/* Mobile Sidebar */}
-          <div className="fixed top-0 right-0 h-full z-50 md:hidden w-96 max-w-[100vw] animate-slideLeft" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-white h-full shadow-2xl flex flex-col">
-              {/* Modal Header */}
-              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-white">Info Akun</h2>
-                  <button 
-                    onClick={() => setShowInfoModal(false)}
-                    className="text-white/80 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
+          <div className="fixed inset-0 z-50 md:hidden flex">
+            <div className="flex-1 bg-black/30" onClick={() => setShowInfoModal(false)} />
+
+            <div className="w-80 max-w-full bg-white h-full shadow-xl flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <h2 className="text-base font-semibold text-gray-900">Info Akun</h2>
+                <button onClick={() => setShowInfoModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Profile */}
+              <div className="px-5 py-4 flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                  <User className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center shadow-lg">
-                    <User className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="text-white">
-                    <p className="text-lg font-semibold">{user?.name || 'User'}</p>
-                    <p className="text-sm text-white/80">{role}</p>
-                  </div>
+                <div>
+                  <p className="font-medium text-gray-900">{user?.name || 'User'}</p>
+                  <p className="text-sm text-gray-500">{role}</p>
                 </div>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Username</label>
-                  <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 font-medium">
-                    {user?.name || 'User'}
-                  </div>
-                </div>
+              <div className="border-t border-gray-100" />
 
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">NIP</label>
-                  <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900">
-                    {nip}
-                  </div>
+              {/* Details */}
+              <div className="px-5 py-4 space-y-3 text-sm flex-1">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Username</span>
+                  <span className="font-medium text-gray-900">{user?.name}</span>
                 </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Role</label>
-                  <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 flex items-center justify-between">
-                    <span>{role}</span>
-                    <span className="bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-full font-medium">Active</span>
-                  </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">NIP</span>
+                  <span className="font-medium text-gray-900">{nip}</span>
                 </div>
-
-                <div className="pt-4 space-y-3">
-                  <button 
-                    onClick={() => {
-                      try {
-                        ssoService.redirectToAdminPanel();
-                      } catch (error) {
-                        console.error('Failed to access admin panel:', error);
-                        alert('Gagal mengakses Admin Panel. Silakan coba lagi.');
-                      }
-                    }}
-                    className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
-                  >
-                    <Settings className="w-5 h-5" />
-                    Admin Panel
-                  </button>
-
-                  <button 
-                    onClick={logout}
-                    className="w-full bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    Keluar
-                  </button>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Status</span>
+                  <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-600 font-medium">Active</span>
                 </div>
+              </div>
+
+              {/* Actions */}
+              <div className="p-4 border-t border-gray-100 space-y-2">
+                <button
+                  onClick={() => ssoService.redirectToAdminPanel()}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 rounded-lg flex items-center justify-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  Admin PanelF
+                </button>
+
+                <button
+                  onClick={logout}
+                  className="w-full text-sm text-red-600 hover:bg-red-50 py-2.5 rounded-lg flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Keluar
+                </button>
               </div>
             </div>
           </div>
+
         </>
       )}
 
@@ -318,124 +297,142 @@ export default function Dashboard({ user }: DashboardProps) {
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
             </div>
-          ) : applications.length === 0 ? (
+          ) : accessProfiles.length === 0 ? (
             <div className="flex justify-center items-center py-12">
               <div className="text-center">
                 <Hospital className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 text-lg">Tidak ada aplikasi yang tersedia</p>
-                <p className="text-gray-400 text-sm mt-2">Hubungi administrator untuk akses aplikasi</p>
+                <p className="text-gray-600 text-lg">Tidak ada akses profil yang tersedia</p>
+                <p className="text-gray-400 text-sm mt-2">Hubungi administrator untuk diberikan akses</p>
               </div>
             </div>
           ) : (
-            <>
-              {/* Applications Grid - Full Width */}
-              <div className="w-full">
-                {/* Applications Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-                  {applications.map((app, index) => {
-                    const Icon = app.icon;
-                    return (
-                      <div
-                        key={app.id}
-                        style={{ opacity: 0, animation: `slideUp 0.6s ease-out ${0.1 * index}s forwards` }}
-                      >
-                        <button
-                          onClick={() => handleAppClick(app)}
-                          disabled={!app.isOnline}
-                          className="relative cursor-pointer group w-full text-left h-full disabled:opacity-60 disabled:cursor-not-allowed"
+            <div className="space-y-10">
+              {accessProfiles.map((profileGroup) => (
+                <div key={profileGroup.profile.id}>
+                  {/* Profile Header */}
+                  <div className="mb-6 pb-4 border-b border-blue-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                        <Award className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-2xl font-bold text-gray-900">{profileGroup.profile.name}</h3>
+                        {profileGroup.profile.description && (
+                          <p className="text-sm text-gray-600">{profileGroup.profile.description}</p>
+                        )}
+                      </div>
+                      {profileGroup.profile.is_system && (
+                        <div className="flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                          <Lock className="w-3 h-3" />
+                          System
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 ml-11">
+                      {profileGroup.applications.length} aplikasi tersedia
+                    </p>
+                  </div>
+
+                  {/* Applications Grid for this Profile */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 mb-8">
+                    {profileGroup.applications.map((app, index) => {
+                      const Icon = app.icon;
+                      return (
+                        <div
+                          key={app.id}
+                          style={{ opacity: 0, animation: `slideUp 0.6s ease-out ${0.05 * index}s forwards` }}
                         >
-                          <div className={`bg-white/70 backdrop-blur-md rounded-2xl p-5 md:p-6 shadow-lg hover:shadow-2xl border border-blue-100/50 transition-all duration-300 h-full relative overflow-hidden ${!app.isOnline ? 'opacity-75' : 'hover:scale-105 active:scale-95'}`}>
-                            {/* Gradient overlay on hover */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-cyan-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
+                          <button
+                            onClick={() => handleAppClick(app)}
+                            disabled={!app.isOnline}
+                            className="relative cursor-pointer group w-full text-left h-full disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <div className={`bg-white/70 backdrop-blur-md rounded-2xl p-5 md:p-6 shadow-lg hover:shadow-2xl border border-blue-100/50 transition-all duration-300 h-full relative overflow-hidden ${!app.isOnline ? 'opacity-75' : 'hover:scale-105 active:scale-95'}`}>
+                              {/* Gradient overlay on hover */}
+                              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-cyan-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
 
-                            {/* Offline overlay */}
-                            {!app.isOnline && (
-                              <div className="absolute inset-0 bg-red-500/10 rounded-2xl z-30 flex items-center justify-center">
-                                <span className="text-red-700 font-semibold text-sm bg-red-100/80 px-3 py-1.5 rounded-lg backdrop-blur-sm">Offline</span>
-                              </div>
-                            )}
+                              {/* Offline overlay */}
+                              {!app.isOnline && (
+                                <div className="absolute inset-0 bg-red-500/10 rounded-2xl z-30 flex items-center justify-center">
+                                  <span className="text-red-700 font-semibold text-sm bg-red-100/80 px-3 py-1.5 rounded-lg backdrop-blur-sm">Offline</span>
+                                </div>
+                              )}
 
-                            {/* Notification Badge */}
-
+                              {/* Notification Badge */}
                               <div className="absolute top-3 right-3 z-20">
                                 <div className="bg-gradient-to-r from-rose-500 to-pink-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
-                                  {app.notifications > 99 ? '99+' : app.notifications}
+                                  0
                                 </div>
                               </div>
 
-                            {/* Icon */}
-                            <div className={`inline-flex p-3.5 rounded-xl bg-gradient-to-br ${app.gradient} text-white shadow-lg mb-4 relative z-10 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300`}>
-                              <Icon className="w-8 h-8" />
-                              <div className={`absolute inset-0 bg-gradient-to-br ${app.gradient} rounded-xl blur-md opacity-50 -z-10`}></div>
-                            </div>
+                              {/* Icon */}
+                              <div className={`inline-flex p-3.5 rounded-xl bg-gradient-to-br ${app.gradient} text-white shadow-lg mb-4 relative z-10 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300`}>
+                                <Icon className="w-8 h-8" />
+                                <div className={`absolute inset-0 bg-gradient-to-br ${app.gradient} rounded-xl blur-md opacity-50 -z-10`}></div>
+                              </div>
 
-                            {/* Content */}
-                            <div className="mb-4 relative z-10">
-                              <h3 className="text-lg font-bold text-gray-900 mb-2 leading-snug group-hover:text-blue-600 transition-colors">
-                                {app.name}
-                              </h3>
-                              <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                                {app.description}
-                              </p>
-                              
-                              {/* Status and Access Info */}
-                              <div className="space-y-1.5 flex flex-wrap gap-2 items-center">
-                                {/* Status Badge */}
-                                {app.status && (
+                              {/* Content */}
+                              <div className="mb-4 relative z-10">
+                                <h4 className="text-lg font-bold text-gray-900 mb-2 leading-snug group-hover:text-blue-600 transition-colors">
+                                  {app.name}
+                                </h4>
+                                <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                                  {app.description}
+                                </p>
+
+                                {/* Role Badge */}
+                                <div className="space-y-2">
                                   <div className="flex items-center gap-2">
-                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
-                                      app.status === 'Ready' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
-                                      app.status === 'Beta' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                                    <span className="text-xs font-semibold text-gray-600">Role:</span>
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                                      {app.role.name || app.role.slug}
+                                    </span>
+                                  </div>
+
+                                  {/* Status Badge */}
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${app.enabled ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
                                       'bg-red-100 text-red-700 border border-red-200'
-                                    }`}>
-                                      {app.status === 'Offline' && (
-                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                                      )}
-                                      {(app.status === 'Ready' || app.status === 'Beta') && (
+                                      }`}>
+                                      {app.enabled && (
                                         <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                                       )}
-                                      {app.status}
+                                      {!app.enabled && (
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                                      )}
+                                      {app.enabled ? 'Ready' : 'Offline'}
                                     </span>
                                   </div>
-                                )}
-                                
-                                {/* Access Badge */}
-                                {app.access && app.access !== 'Unavailable' && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs border border-blue-200 text-blue-700 bg-blue-50/80 backdrop-blur-sm px-2 py-1 rounded">
-                                      {app.access}
-                                    </span>
-                                  </div>
-                                )}
+                                </div>
                               </div>
-                            </div>
 
-                            {/* Hover indicator */}
-                            <div className={`absolute bottom-4 right-4 opacity-0 transition-opacity duration-300 z-10 ${!app.isOnline ? 'hidden' : 'group-hover:opacity-100'}`}>
-                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
-                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
+                              {/* Hover indicator */}
+                              <div className={`absolute bottom-4 right-4 opacity-0 transition-opacity duration-300 z-10 ${!app.isOnline ? 'hidden' : 'group-hover:opacity-100'}`}>
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
+                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </button>
-                      </div>
-                    );
-                  })}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            </>
+              ))}
+            </div>
           )}
         </div>
 
         {/* Footer Info */}
         <div className="mt-16 text-center" style={{ animation: 'fadeIn 0.8s ease-out 1.5s forwards', opacity: 0 }}>
           <p className="text-sm text-gray-500 mb-2">
-            💡 Tip: Klik pada aplikasi untuk membuka, atau akses Admin Panel untuk pengaturan tambahan
+            💡 Tip: Organisir berdasarkan Access Profile Anda. Klik aplikasi untuk membuka, atau akses Admin Panel untuk pengaturan tambahan
           </p>
           <p className="text-xs text-gray-400">
-            Semua data terlindungi dengan enkripsi tingkat enterprise
+            Total {accessProfiles.length} profil akses dengan {totalApps} aplikasi yang tersedia
           </p>
         </div>
       </main>
